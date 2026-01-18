@@ -1,0 +1,288 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://houseofconsequences.org/schemas/audit.report.schema.json",
+  "title": "Audit Report Schema",
+  "description": "Legally admissible audit trail report schema with cryptographic integrity, evidentiary metadata, and QES signature support.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "report_id",
+    "generated_at",
+    "report_type",
+    "subject",
+    "jurisdiction",
+    "legal_basis",
+    "evidence_scope",
+    "evidence_summary",
+    "audit_log_snapshot",
+    "integrity",
+    "signatures",
+    "legal_status"
+  ],
+
+  "properties": {
+    "report_id": {
+      "type": "string",
+      "description": "Globally unique identifier for the audit report."
+    },
+
+    "generated_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "ISO-8601 timestamp of report generation."
+    },
+
+    "report_type": {
+      "type": "string",
+      "enum": [
+        "compliance_report",
+        "forensic_report",
+        "regulatory_submission",
+        "judicial_evidence",
+        "internal_review"
+      ]
+    },
+
+    "subject": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["entity_id", "entity_type", "description"],
+      "properties": {
+        "entity_id": { "type": "string" },
+        "entity_type": {
+          "type": "string",
+          "enum": ["system", "organization", "decision", "case", "user", "process"]
+        },
+        "description": { "type": "string" }
+      }
+    },
+
+    "jurisdiction": {
+      "type": "string",
+      "description": "Legal jurisdiction under which this report is valid (e.g., FI, EU, US-CA)."
+    },
+
+    "legal_basis": {
+      "type": "array",
+      "description": "Applicable legal instruments and compliance grounds.",
+      "minItems": 1,
+      "items": {
+        "type": "string",
+        "enum": [
+          "GDPR",
+          "eIDAS",
+          "NIS2",
+          "ISO27001",
+          "ISO27701",
+          "AdministrativeProcedureAct",
+          "ConstitutionalLaw",
+          "CriminalProcedureAct",
+          "FreedomOfInformationAct"
+        ]
+      }
+    },
+
+    "evidence_scope": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["start_time", "end_time", "included_event_types", "excluded_event_types"],
+      "properties": {
+        "start_time": { "type": "string", "format": "date-time" },
+        "end_time": { "type": "string", "format": "date-time" },
+        "included_event_types": {
+          "type": "array",
+          "items": { "type": "string" },
+          "minItems": 1
+        },
+        "excluded_event_types": {
+          "type": "array",
+          "items": { "type": "string" }
+        }
+      }
+    },
+
+    "evidence_summary": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "total_events",
+        "first_event_at",
+        "last_event_at",
+        "anomalies_detected",
+        "tamper_indicators"
+      ],
+      "properties": {
+        "total_events": { "type": "integer", "minimum": 0 },
+        "first_event_at": { "type": "string", "format": "date-time" },
+        "last_event_at": { "type": "string", "format": "date-time" },
+        "anomalies_detected": { "type": "boolean" },
+        "tamper_indicators": {
+          "type": "array",
+          "items": { "type": "string" }
+        }
+      }
+    },
+
+    "audit_log_snapshot": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["storage_id", "snapshot_at", "chain_hash", "hash_algorithm", "entries"],
+      "properties": {
+        "storage_id": { "type": "string" },
+        "snapshot_at": { "type": "string", "format": "date-time" },
+        "chain_hash": { "type": "string" },
+        "hash_algorithm": {
+          "type": "string",
+          "enum": ["SHA-256", "SHA-384", "SHA-512", "BLAKE3"]
+        },
+        "entries": {
+          "type": "array",
+          "items": {
+            "$ref": "https://houseofconsequences.org/schemas/audit.log.schema.json"
+          },
+          "minItems": 1
+        }
+      }
+    },
+
+    "integrity": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["report_hash", "hash_algorithm", "hash_scope"],
+      "properties": {
+        "report_hash": { "type": "string" },
+        "hash_algorithm": {
+          "type": "string",
+          "enum": ["SHA-256", "SHA-384", "SHA-512", "BLAKE3"]
+        },
+        "hash_scope": {
+          "type": "string",
+          "enum": ["full_document", "content_only", "metadata_only"]
+        }
+      }
+    },
+
+    "signatures": {
+      "type": "array",
+      "description": "Cryptographic signatures applied to the report, including QES.",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "signer_id",
+          "signer_role",
+          "signature_type",
+          "signature_algorithm",
+          "signed_at",
+          "signature_value",
+          "certificate_fingerprint",
+          "trust_provider",
+          "legal_effect"
+        ],
+        "properties": {
+          "signer_id": { "type": "string" },
+          "signer_role": {
+            "type": "string",
+            "enum": ["system", "auditor", "legal_officer", "judge", "notary", "authority"]
+          },
+          "signature_type": {
+            "type": "string",
+            "enum": ["QES", "AdES", "AES", "PAdES", "XAdES", "CAdES"]
+          },
+          "signature_algorithm": {
+            "type": "string",
+            "enum": ["RSA-PSS-SHA256", "ECDSA-P256-SHA256", "Ed25519"]
+          },
+          "signed_at": { "type": "string", "format": "date-time" },
+          "signature_value": { "type": "string" },
+          "certificate_fingerprint": { "type": "string" },
+          "trust_provider": { "type": "string" },
+          "legal_effect": {
+            "type": "string",
+            "enum": ["non_repudiation", "legal_binding", "judicial_admissibility"]
+          }
+        }
+      }
+    },
+
+    "legal_status": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["evidentiary_class", "court_admissible", "compliance_frameworks"],
+      "properties": {
+        "evidentiary_class": {
+          "type": "string",
+          "enum": ["administrative", "regulatory", "judicial", "forensic"]
+        },
+        "court_admissible": { "type": "boolean" },
+        "compliance_frameworks": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "enum": ["GDPR", "eIDAS", "NIS2", "ISO27001", "ISO27701"]
+          },
+          "minItems": 1
+        }
+      }
+    }
+  },
+
+  "examples": [
+    {
+      "report_id": "audit-report-fi-2026-01",
+      "generated_at": "2026-01-18T05:10:00Z",
+      "report_type": "judicial_evidence",
+      "subject": {
+        "entity_id": "decision-rajamenettelylaki-2026",
+        "entity_type": "decision",
+        "description": "Rajamenettelylain valmisteluprosessin oikeudellinen auditointi"
+      },
+      "jurisdiction": "FI",
+      "legal_basis": ["GDPR", "eIDAS", "AdministrativeProcedureAct"],
+      "evidence_scope": {
+        "start_time": "2025-01-01T00:00:00Z",
+        "end_time": "2026-01-18T05:00:00Z",
+        "included_event_types": ["decision_created", "evidence_added", "risk_assessed", "approval_granted"],
+        "excluded_event_types": []
+      },
+      "evidence_summary": {
+        "total_events": 1842,
+        "first_event_at": "2025-01-02T08:14:00Z",
+        "last_event_at": "2026-01-17T22:41:00Z",
+        "anomalies_detected": false,
+        "tamper_indicators": []
+      },
+      "audit_log_snapshot": {
+        "storage_id": "audit-storage-fi-2026-01",
+        "snapshot_at": "2026-01-18T05:05:00Z",
+        "chain_hash": "e4b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "hash_algorithm": "SHA-256",
+        "entries": []
+      },
+      "integrity": {
+        "report_hash": "b1946ac92492d2347c6235b4d2611184",
+        "hash_algorithm": "SHA-256",
+        "hash_scope": "full_document"
+      },
+      "signatures": [
+        {
+          "signer_id": "system-qes-signer",
+          "signer_role": "system",
+          "signature_type": "QES",
+          "signature_algorithm": "RSA-PSS-SHA256",
+          "signed_at": "2026-01-18T05:11:00Z",
+          "signature_value": "BASE64SIGNATURE==",
+          "certificate_fingerprint": "AB:CD:EF:12:34:56:78:90",
+          "trust_provider": "EU Trusted List CA",
+          "legal_effect": "judicial_admissibility"
+        }
+      ],
+      "legal_status": {
+        "evidentiary_class": "judicial",
+        "court_admissible": true,
+        "compliance_frameworks": ["GDPR", "eIDAS", "NIS2", "ISO27001"]
+      }
+    }
+  ]
+}

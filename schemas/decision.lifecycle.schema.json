@@ -1,0 +1,343 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://houseofconsequences.org/schemas/decision.lifecycle.schema.json",
+  "title": "Decision Lifecycle Schema",
+  "description": "Canonical schema for modeling institutional decisions across the full House of Consequences lifecycle: decision → impact → consequences → adaptation → recursion → normalization → learning.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "metadata",
+    "decision",
+    "impact",
+    "consequences",
+    "adaptation",
+    "recursion",
+    "normalization",
+    "learning"
+  ],
+  "properties": {
+    "metadata": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "title",
+        "domain",
+        "version",
+        "created_at",
+        "authors",
+        "governance_level",
+        "jurisdiction"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Globally unique decision identifier."
+        },
+        "title": {
+          "type": "string"
+        },
+        "domain": {
+          "type": "string",
+          "description": "Policy domain (e.g., healthcare, education, security, environment)."
+        },
+        "version": {
+          "type": "string",
+          "pattern": "^\\d+\\.\\d+\\.\\d+$"
+        },
+        "created_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "authors": {
+          "type": "array",
+          "items": { "type": "string" },
+          "minItems": 1
+        },
+        "governance_level": {
+          "type": "string",
+          "enum": ["local", "regional", "national", "supranational", "global"]
+        },
+        "jurisdiction": {
+          "type": "string",
+          "description": "Legal jurisdiction (e.g., FI, EU, UN)."
+        }
+      }
+    },
+
+    "decision": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "decision_text",
+        "decision_type",
+        "decision_date",
+        "actors",
+        "stated_objectives",
+        "legal_basis",
+        "assumptions",
+        "alternatives_considered",
+        "risk_acknowledgement"
+      ],
+      "properties": {
+        "decision_text": {
+          "type": "string",
+          "description": "Official wording of the decision or law."
+        },
+        "decision_type": {
+          "type": "string",
+          "enum": ["law", "regulation", "policy", "investment", "administrative_action", "emergency_measure"]
+        },
+        "decision_date": {
+          "type": "string",
+          "format": "date"
+        },
+        "actors": {
+          "type": "array",
+          "items": { "type": "string" },
+          "minItems": 1
+        },
+        "stated_objectives": {
+          "type": "array",
+          "items": { "type": "string" },
+          "minItems": 1
+        },
+        "legal_basis": {
+          "type": "array",
+          "items": { "type": "string" },
+          "minItems": 1
+        },
+        "assumptions": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Explicit or implicit assumptions underlying the decision."
+        },
+        "alternatives_considered": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Meaningfully different options considered and rejected."
+        },
+        "risk_acknowledgement": {
+          "type": "string",
+          "description": "Official recognition (or denial) of potential risks."
+        }
+      }
+    },
+
+    "impact": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "immediate_effects",
+        "target_population",
+        "resources_committed",
+        "implementation_mechanism",
+        "early_signals"
+      ],
+      "properties": {
+        "immediate_effects": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "target_population": {
+          "type": "string"
+        },
+        "resources_committed": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["financial", "human", "institutional"],
+          "properties": {
+            "financial": { "type": "string" },
+            "human": { "type": "string" },
+            "institutional": { "type": "string" }
+          }
+        },
+        "implementation_mechanism": {
+          "type": "string"
+        },
+        "early_signals": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Early warnings or anomalies observed after implementation."
+        }
+      }
+    },
+
+    "consequences": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "intended_outcomes",
+        "unintended_outcomes",
+        "harm_indicators",
+        "benefit_indicators",
+        "distributional_effects"
+      ],
+      "properties": {
+        "intended_outcomes": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "unintended_outcomes": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "harm_indicators": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "benefit_indicators": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "distributional_effects": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["winners", "losers", "inequities"],
+          "properties": {
+            "winners": { "type": "array", "items": { "type": "string" } },
+            "losers": { "type": "array", "items": { "type": "string" } },
+            "inequities": { "type": "string" }
+          }
+        }
+      }
+    },
+
+    "adaptation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "institutional_responses",
+        "policy_adjustments",
+        "resource_reallocation",
+        "narrative_shift",
+        "resistance_patterns"
+      ],
+      "properties": {
+        "institutional_responses": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "policy_adjustments": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "resource_reallocation": {
+          "type": "string"
+        },
+        "narrative_shift": {
+          "type": "string",
+          "description": "How the public or official narrative changes over time."
+        },
+        "resistance_patterns": {
+          "type": "array",
+          "items": { "type": "string" }
+        }
+      }
+    },
+
+    "recursion": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "feedback_loops",
+        "amplification_effects",
+        "system_strain",
+        "secondary_crises",
+        "cross_sector_spillovers"
+      ],
+      "properties": {
+        "feedback_loops": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "amplification_effects": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "system_strain": {
+          "type": "string"
+        },
+        "secondary_crises": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "cross_sector_spillovers": {
+          "type": "array",
+          "items": { "type": "string" }
+        }
+      }
+    },
+
+    "normalization": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "new_normal_definition",
+        "normalized_harms",
+        "normalized_benefits",
+        "institutional_acceptance",
+        "accountability_status",
+        "public_perception"
+      ],
+      "properties": {
+        "new_normal_definition": {
+          "type": "string"
+        },
+        "normalized_harms": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "normalized_benefits": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "institutional_acceptance": {
+          "type": "string",
+          "enum": ["denied", "acknowledged", "justified", "codified"]
+        },
+        "accountability_status": {
+          "type": "string",
+          "enum": ["none", "symbolic", "partial", "full"]
+        },
+        "public_perception": {
+          "type": "string"
+        }
+      }
+    },
+
+    "learning": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "lessons_identified",
+        "preventive_measures",
+        "policy_reforms",
+        "early_warning_indicators",
+        "institutional_memory_update"
+      ],
+      "properties": {
+        "lessons_identified": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "preventive_measures": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "policy_reforms": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "early_warning_indicators": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "institutional_memory_update": {
+          "type": "string",
+          "description": "How the institution formally records and integrates this learning."
+        }
+      }
+    }
+  }
+}

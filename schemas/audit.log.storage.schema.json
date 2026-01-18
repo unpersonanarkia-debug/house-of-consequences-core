@@ -1,0 +1,190 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://houseofconsequences.org/schemas/audit.log.storage.schema.json",
+  "title": "Audit Log Storage Schema",
+  "description": "Append-only, tamper-evident, legally admissible storage schema for audit logs with cryptographic chaining and WORM compliance.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "storage_id",
+    "created_at",
+    "storage_policy",
+    "log_chain",
+    "retention",
+    "integrity",
+    "legal_status"
+  ],
+
+  "properties": {
+    "storage_id": {
+      "type": "string",
+      "description": "Globally unique identifier for the audit log storage container."
+    },
+
+    "created_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "ISO-8601 timestamp of storage initialization."
+    },
+
+    "storage_policy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["append_only", "worm_compliant", "encryption", "access_control"],
+      "properties": {
+        "append_only": {
+          "type": "boolean",
+          "const": true
+        },
+        "worm_compliant": {
+          "type": "boolean",
+          "const": true
+        },
+        "encryption": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["enabled", "algorithm", "key_management"],
+          "properties": {
+            "enabled": { "type": "boolean" },
+            "algorithm": {
+              "type": "string",
+              "enum": ["AES-256-GCM", "ChaCha20-Poly1305"]
+            },
+            "key_management": {
+              "type": "string",
+              "enum": ["HSM", "KMS", "manual", "qes_provider"]
+            }
+          }
+        },
+        "access_control": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["model", "roles"],
+          "properties": {
+            "model": {
+              "type": "string",
+              "enum": ["RBAC", "ABAC", "MAC"]
+            },
+            "roles": {
+              "type": "array",
+              "items": { "type": "string" },
+              "minItems": 1
+            }
+          }
+        }
+      }
+    },
+
+    "log_chain": {
+      "type": "array",
+      "description": "Chronologically ordered, append-only array of audit log entries.",
+      "minItems": 1,
+      "items": {
+        "$ref": "https://houseofconsequences.org/schemas/audit.log.schema.json"
+      }
+    },
+
+    "retention": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["retention_period", "retention_basis", "disposal_method"],
+      "properties": {
+        "retention_period": {
+          "type": "string",
+          "description": "ISO 8601 duration (e.g., P10Y, P30Y, P∞)."
+        },
+        "retention_basis": {
+          "type": "string",
+          "enum": [
+            "legal_obligation",
+            "regulatory_requirement",
+            "contractual",
+            "archival_value",
+            "public_interest"
+          ]
+        },
+        "disposal_method": {
+          "type": "string",
+          "enum": ["none", "secure_delete", "archive_transfer"]
+        }
+      }
+    },
+
+    "integrity": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["chain_hash", "hash_algorithm", "last_chain_position"],
+      "properties": {
+        "chain_hash": {
+          "type": "string",
+          "description": "Cryptographic hash of the entire current log chain."
+        },
+        "hash_algorithm": {
+          "type": "string",
+          "enum": ["SHA-256", "SHA-384", "SHA-512", "BLAKE3"]
+        },
+        "last_chain_position": {
+          "type": "integer",
+          "minimum": 0
+        }
+      }
+    },
+
+    "legal_status": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["evidentiary_class", "compliance_frameworks", "jurisdiction"],
+      "properties": {
+        "evidentiary_class": {
+          "type": "string",
+          "enum": ["administrative", "regulatory", "judicial", "forensic"]
+        },
+        "compliance_frameworks": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "enum": ["GDPR", "eIDAS", "ISO27001", "ISO27701", "SOC2", "NIS2"]
+          },
+          "minItems": 1
+        },
+        "jurisdiction": { "type": "string" }
+      }
+    }
+  },
+
+  "examples": [
+    {
+      "storage_id": "audit-storage-fi-2026-01",
+      "created_at": "2026-01-18T04:30:00Z",
+      "storage_policy": {
+        "append_only": true,
+        "worm_compliant": true,
+        "encryption": {
+          "enabled": true,
+          "algorithm": "AES-256-GCM",
+          "key_management": "HSM"
+        },
+        "access_control": {
+          "model": "RBAC",
+          "roles": ["Auditor", "LegalAuthority", "SystemAdmin"]
+        }
+      },
+      "log_chain": [],
+      "retention": {
+        "retention_period": "P30Y",
+        "retention_basis": "legal_obligation",
+        "disposal_method": "none"
+      },
+      "integrity": {
+        "chain_hash": "0000000000000000000000000000000000000000000000000000000000000000",
+        "hash_algorithm": "SHA-256",
+        "last_chain_position": 0
+      },
+      "legal_status": {
+        "evidentiary_class": "judicial",
+        "compliance_frameworks": ["GDPR", "eIDAS", "ISO27001", "NIS2"],
+        "jurisdiction": "FI"
+      }
+    }
+  ]
+}

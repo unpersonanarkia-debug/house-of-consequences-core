@@ -1,0 +1,146 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://house-of-consequences.org/schemas/governance.decision.schema.json",
+  "title": "Governance Decision Protocol – Locked Schema v1.0",
+  "description": "Universal, system-agnostic schema enforcing measurable, reversible, and monitorable decisions.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "decision_id",
+    "domain",
+    "authority",
+    "timestamp",
+    "intent",
+    "action",
+    "consequence_model",
+    "governance_requirements",
+    "validation_state"
+  ],
+  "properties": {
+    "decision_id": {
+      "type": "string",
+      "pattern": "^[A-Z0-9._-]+$",
+      "description": "Globally unique decision identifier."
+    },
+    "domain": {
+      "type": "string",
+      "minLength": 3
+    },
+    "authority": {
+      "type": "string",
+      "minLength": 3,
+      "description": "Issuing authority or system."
+    },
+    "timestamp": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "intent": {
+      "type": "string",
+      "minLength": 10
+    },
+    "action": {
+      "type": "string",
+      "minLength": 10
+    },
+    "consequence_model": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "predicted_impacts",
+        "uncertainty_level",
+        "reversibility_score",
+        "normalization_risk"
+      ],
+      "properties": {
+        "predicted_impacts": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "string",
+            "minLength": 5
+          }
+        },
+        "uncertainty_level": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "reversibility_score": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1,
+          "description": "0 = irreversible, 1 = fully reversible"
+        },
+        "normalization_risk": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1,
+          "description": "Risk that harm becomes normalized over time."
+        }
+      }
+    },
+    "governance_requirements": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "measurement_indicators",
+        "monitoring_plan",
+        "reversal_protocol",
+        "review_cycle_days"
+      ],
+      "properties": {
+        "measurement_indicators": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "name",
+              "metric",
+              "acceptable_threshold",
+              "allowed_duration_days"
+            ],
+            "properties": {
+              "name": {
+                "type": "string",
+                "minLength": 3
+              },
+              "metric": {
+                "type": "string",
+                "minLength": 3
+              },
+              "acceptable_threshold": {
+                "type": "number"
+              },
+              "allowed_duration_days": {
+                "type": "integer",
+                "minimum": 1
+              }
+            }
+          }
+        },
+        "monitoring_plan": {
+          "type": "object",
+          "minProperties": 1,
+          "description": "Operational monitoring procedure."
+        },
+        "reversal_protocol": {
+          "type": "object",
+          "minProperties": 1,
+          "description": "Executable rollback or revocation protocol."
+        },
+        "review_cycle_days": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 365
+        }
+      }
+    },
+    "validation_state": {
+      "type": "string",
+      "enum": ["PENDING", "VALID", "INVALID", "REVOKED"]
+    }
+  }
+}

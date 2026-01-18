@@ -91,8 +91,10 @@ http://127.0.0.1:8000/docs
 
 Tämä core-moottori on suunniteltu integroitavaksi:
 	•	valtiollisiin päätöksentekojärjestelmiin,
-	•	yritysten governance-alustoihin,
 	•	kansalaisyhteiskunnan seurantatyökaluihin.
+        (Kansalaisaloite, avoin data jne.)
+    •	yritysten governance-palvelut toimivat
+        erillisellä kaupallisella lisenssillä.
 
 Julkinen portaali: https://houseofconsequences.org
 

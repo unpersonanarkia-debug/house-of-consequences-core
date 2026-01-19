@@ -1,13 +1,13 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://houseofconsequences.org/schemas/audit.log.schema.json",
-  "title": "Audit Log Schema",
-  "description": "Tamper-proof, legally admissible audit log schema for decision lifecycle, evidence, governance and system actions.",
+  "title": "Audit Log Entry Schema (Canonical v1.1)",
+  "description": "Single cryptographically chained, legally admissible audit log entry for House of Consequences Core. Enables full evidentiary reconstruction and DAO verification.",
   "type": "object",
   "additionalProperties": false,
   "required": [
-    "log_id",
-    "timestamp",
+    "event_id",
+    "timestamp", 
     "actor",
     "action",
     "object",
@@ -15,38 +15,45 @@
     "integrity",
     "legal_status"
   ],
-
   "properties": {
-    "log_id": {
+    "event_id": {
       "type": "string",
-      "description": "Globally unique log entry identifier (UUIDv7 recommended)."
+      "format": "uuid",
+      "description": "Globally unique event identifier."
     },
-
     "timestamp": {
       "type": "string",
       "format": "date-time",
-      "description": "ISO-8601 timestamp of the event in UTC."
+      "description": "ISO-8601 event timestamp (trusted clock source)."
     },
-
     "actor": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["actor_id", "actor_type", "authentication_method"],
+      "required": ["actor_id", "actor_type", "authentication_method", "role"],
       "properties": {
-        "actor_id": { "type": "string" },
+        "actor_id": {
+          "type": "string",
+          "description": "Unique actor identifier (pseudonymized where required)."
+        },
         "actor_type": {
           "type": "string",
-          "enum": ["human", "system", "service", "ai_agent"]
+          "enum": ["human", "system", "service", "ai_agent"],
+          "description": "Classification of actor."
         },
         "authentication_method": {
           "type": "string",
           "enum": ["password", "mfa", "oauth", "pki", "qes", "service_account"]
         },
-        "role": { "type": "string" },
-        "organization": { "type": "string" }
+        "role": {
+          "type": "string",
+          "description": "RBAC/ABAC role within HoC governance context."
+        },
+        "organization": {
+          "type": "string",
+          "description": "Organizational affiliation (if applicable)."
+        }
       }
     },
-
     "action": {
       "type": "object",
       "additionalProperties": false,
@@ -55,20 +62,14 @@
         "type": {
           "type": "string",
           "enum": [
-            "create",
-            "read",
-            "update",
-            "delete",
-            "sign",
-            "validate",
-            "approve",
-            "reject",
-            "publish",
-            "archive",
-            "escalate"
+            "create", "read", "update", "delete", "sign", "validate", 
+            "approve", "reject", "publish", "archive", "escalate"
           ]
         },
-        "operation": { "type": "string" },
+        "operation": {
+          "type": "string",
+          "description": "Specific operation identifier (e.g., decision.approval)."
+        },
         "status": {
           "type": "string",
           "enum": ["success", "failure", "partial", "pending"]
@@ -77,34 +78,27 @@
         "error_message": { "type": "string" }
       }
     },
-
     "object": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["object_type", "object_id"],
+      "required": ["object_type", "object_id", "object_hash"],
       "properties": {
         "object_type": {
           "type": "string",
           "enum": [
-            "decision",
-            "evidence_pack",
-            "policy",
-            "schema",
-            "report",
-            "signature",
-            "user",
-            "system_config"
+            "decision", "evidence_pack", "policy", "schema", "report", 
+            "signature", "user", "system_config", "governance_rfc"
           ]
         },
         "object_id": { "type": "string" },
         "object_version": { "type": "string" },
         "object_hash": {
           "type": "string",
-          "description": "Cryptographic hash (e.g., SHA-256) of the object state at the time of action."
+          "pattern": "^[a-fA-F0-9]{64}$",
+          "description": "SHA-256 hash of object state at time of action."
         }
       }
     },
-
     "context": {
       "type": "object",
       "additionalProperties": false,
@@ -114,31 +108,37 @@
         "lifecycle_stage": {
           "type": "string",
           "enum": [
-            "impact",
-            "consequences",
-            "adaptation",
-            "compounding",
-            "norm",
-            "learning"
-          ]
+            "impact", "consequences", "adaptation", "compounding", "norm", "learning"
+          ],
+          "description": "House of Consequences lifecycle stage (PDCA/Bloom mapping)."
         },
-        "jurisdiction": { "type": "string" },
+        "jurisdiction": {
+          "type": "string",
+          "pattern": "^[A-Z]{2}$"
+        },
         "legal_basis": { "type": "string" },
         "policy_reference": { "type": "string" },
         "case_reference": { "type": "string" }
       }
     },
-
     "integrity": {
       "type": "object",
       "additionalProperties": false,
       "required": ["hash", "previous_hash", "hash_algorithm", "chain_position"],
       "properties": {
-        "hash": { "type": "string" },
-        "previous_hash": { "type": "string" },
+        "hash": {
+          "type": "string",
+          "pattern": "^[a-fA-F0-9]{64}$",
+          "description": "SHA-256 hash of THIS entry (excluding this field)."
+        },
+        "previous_hash": {
+          "type": "string",
+          "pattern": "^[a-fA-F0-9]{64}$|^0000000000000000000000000000000000000000000000000000000000000000$",
+          "description": "Hash of previous entry (zero for genesis)."
+        },
         "hash_algorithm": {
           "type": "string",
-          "enum": ["SHA-256", "SHA-384", "SHA-512", "BLAKE2", "BLAKE3"]
+          "const": "SHA-256"
         },
         "chain_position": {
           "type": "integer",
@@ -146,7 +146,6 @@
         }
       }
     },
-
     "legal_status": {
       "type": "object",
       "additionalProperties": false,
@@ -156,7 +155,10 @@
           "type": "string",
           "enum": ["administrative", "regulatory", "judicial", "forensic"]
         },
-        "retention_policy": { "type": "string" },
+        "retention_policy": {
+          "type": "string",
+          "pattern": "^P(?:\\d+Y)?(?:\\d+M)?(?:\\d+D)?$|^P∞$|^Permanent$"
+        },
         "admissibility": {
           "type": "string",
           "enum": ["prima_facie", "supporting", "non_admissible"]
@@ -167,7 +169,6 @@
         }
       }
     },
-
     "signature": {
       "type": "object",
       "additionalProperties": false,
@@ -177,28 +178,27 @@
           "type": "string",
           "enum": ["none", "simple", "advanced", "qualified"]
         },
-        "signed_at": {
-          "type": "string",
-          "format": "date-time"
-        },
+        "signed_at": { "type": "string", "format": "date-time" },
         "signer_id": { "type": "string" },
         "certificate_fingerprint": { "type": "string" },
         "signature_value": { "type": "string" },
-        "signature_algorithm": { "type": "string" }
+        "signature_algorithm": {
+          "type": "string",
+          "enum": ["RSA-PSS-SHA256", "EdDSA", "ECDSA-SHA256"]
+        }
       }
     }
   },
-
   "examples": [
     {
-      "log_id": "018f9d9b-3d7e-7b6a-bb9e-4fae2b6c9e11",
-      "timestamp": "2026-01-18T04:22:33Z",
+      "event_id": "018f9d9b-3d7e-7b6a-bb9e-4fae2b6c9e11",
+      "timestamp": "2026-01-19T09:38:00Z",
       "actor": {
         "actor_id": "user-29481",
         "actor_type": "human",
         "authentication_method": "qes",
-        "role": "Decision Authority",
-        "organization": "Ministry of Justice"
+        "role": "DecisionAuthority",
+        "organization": "MinistryOfJustice"
       },
       "action": {
         "type": "approve",
@@ -209,21 +209,20 @@
         "object_type": "decision",
         "object_id": "decision-rajamenettelylaki-2026",
         "object_version": "1.0.3",
-        "object_hash": "c9b1f1a1e7c6b99e5b0e78b4d1f8e4c5c7a6d5f2b1a9e8d7c6b5a4f3e2d1c"
+        "object_hash": "c9b1f1a1e7c6b99e5b0e78b4d1f8e4c5c7a6d5f2b1a9e8d7c6b5a4f3e2d1c0"
       },
       "context": {
         "decision_id": "decision-rajamenettelylaki-2026",
         "lifecycle_stage": "norm",
         "jurisdiction": "FI",
-        "legal_basis": "Perustuslaki 2 §, Hallintolaki 6 §",
-        "policy_reference": "Government Programme 2026",
-        "case_reference": "HOCC-CASE-0001"
+        "legal_basis": "Perustuslaki 2 §",
+        "policy_reference": "GovernmentProgramme2026"
       },
       "integrity": {
-        "hash": "a4f1b9d2c7e6f8a3b5c9d1e2f7a8c6b5d9e4a2c1b8f7e6d5c4b3a2f1e0d",
-        "previous_hash": "0000000000000000000000000000000000000000000000000000000000000000",
+        "hash": "a4f1b9d2c7e6f8a3b5c9d1e2f7a8c6b5d9e4a2c1b8f7e6d5c4b3a2f1e0d9c8",
+        "previous_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
         "hash_algorithm": "SHA-256",
-        "chain_position": 0
+        "chain_position": 1
       },
       "legal_status": {
         "evidentiary_class": "judicial",
@@ -233,10 +232,9 @@
       },
       "signature": {
         "signature_type": "qualified",
-        "signed_at": "2026-01-18T04:22:35Z",
+        "signed_at": "2026-01-19T09:38:02Z",
         "signer_id": "QES-CERT-99887766",
-        "certificate_fingerprint": "AB:CD:EF:12:34:56:78:90:AB:CD:EF:12:34:56:78:90",
-        "signature_value": "BASE64ENCODEDSIGNATURE==",
+        "certificate_fingerprint": "ABCD:EF12:3456:7890:ABCD:EF12:3456:7890",
         "signature_algorithm": "RSA-PSS-SHA256"
       }
     }

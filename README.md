@@ -114,6 +114,7 @@ Tämän järjestelmän ydinarvo on rakenteellinen riippumattomuus.
 Käyttöoikeudet, lisenssit ja institutionaalinen hallintamalli määritellään erillisessä GOVERNANCE_MODEL.md-dokumentissa.
 
 
+
 ✨ Seuraavat vaiheet
 	1.	🔒 JSON Schema -lukitukset
 	2.	⚙️ FastAPI-validointipalvelu

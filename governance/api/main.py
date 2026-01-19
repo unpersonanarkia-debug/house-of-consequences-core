@@ -24,7 +24,7 @@ app = FastAPI(
     version="1.0.0"
 )
 
-BASE_DIR = os.path.dirname(os.path.abspath(_file_))
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 DATA_DIR = os.path.join(BASE_DIR, "..", "..", "data")
 SCHEMA_DIR = os.path.join(BASE_DIR, "..", "..", "schemas")
 REPORT_DIR = os.path.join(BASE_DIR, "..", "..", "reports")

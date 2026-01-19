@@ -1,0 +1,29 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "GovernanceEnforcement",
+  "type": "object",
+  "required": ["decision_id", "compliance_status", "violations", "enforcement_actions"],
+  "properties": {
+    "decision_id": { "type": "string" },
+    "compliance_status": {
+      "type": "string",
+      "enum": ["compliant", "non_compliant", "under_review"]
+    },
+    "violations": {
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "enforcement_actions": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["action", "timestamp", "responsible_entity"],
+        "properties": {
+          "action": { "type": "string" },
+          "timestamp": { "type": "string", "format": "date-time" },
+          "responsible_entity": { "type": "string" }
+        }
+      }
+    }
+  }
+}

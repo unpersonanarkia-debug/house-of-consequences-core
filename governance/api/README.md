@@ -1,4 +1,4 @@
-quences – Governance API
+# House of Consequences – Governance API
 
 Tämä API tarjoaa oikeudellisesti kelvollisen auditointi- ja governance-rajapinnan House of Consequences -ytimelle. Se vastaa päätösten, toimien ja järjestelmätilojen jäljitettävästä kirjaamisesta, raportoinnista ja todentamisesta.
 
@@ -170,4 +170,3 @@ Enterprise-palvelut: erillinen sopimus (katso projektin pää-README).
 Tekniset kysymykset: GitHub Issues  
 Governance-keskustelu: GitHub Discussions  
 Yhteistyö ja pilotit: contact@houseofconsequences.org
-- QES signing (RSA 4096, PSS + SHA-256)

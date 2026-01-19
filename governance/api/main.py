@@ -108,6 +108,56 @@ def load_public_key():
 generate_qes_keypair()
 
 # ============================
+# Blockchain proof utilities
+# ============================
+
+PROOF_DIR = os.path.join(DATA_DIR, "proofs")
+os.makedirs(PROOF_DIR, exist_ok=True)
+
+def generate_blockchain_proof(
+    storage: Dict[str, Any],
+    anchoring_chain: Optional[str] = None,
+    note: Optional[str] = None
+):
+    proof_id = f"blockchain-proof-{uuid.uuid4()}"
+    timestamp = datetime.now(timezone.utc).isoformat()
+
+    payload = {
+        "proof_id": proof_id,
+        "created_at": timestamp,
+        "storage_id": storage["storage_id"],
+        "chain_hash": storage["integrity"]["chain_hash"],
+        "hash_algorithm": storage["integrity"]["hash_algorithm"],
+        "last_chain_position": storage["integrity"]["last_chain_position"],
+        "anchoring_chain": anchoring_chain,
+        "note": note,
+        "jurisdiction": storage["legal_status"]["jurisdiction"],
+        "evidentiary_class": storage["legal_status"]["evidentiary_class"]
+    }
+
+    payload_path = os.path.join(PROOF_DIR, f"{proof_id}.json")
+    with open(payload_path, "w", encoding="utf-8") as f:
+        json.dump(payload, f, indent=2)
+
+    private_key = load_private_key()
+    payload_bytes = json.dumps(payload, sort_keys=True).encode("utf-8")
+
+    signature = private_key.sign(
+        payload_bytes,
+        padding.PSS(
+            mgf=padding.MGF1(hashes.SHA256()),
+            salt_length=padding.PSS.MAX_LENGTH
+        ),
+        hashes.SHA256()
+    )
+
+    signature_path = os.path.join(PROOF_DIR, f"{proof_id}.sig")
+    with open(signature_path, "wb") as f:
+        f.write(signature)
+
+    return proof_id, payload_path, signature_path, payload
+
+# ============================
 # Storage utilities
 # ============================
 
@@ -189,6 +239,24 @@ class AuditReportRequest(BaseModel):
     requesting_authority: str
     purpose: str
     scope: Optional[str] = None
+
+class BlockchainProofRequest(BaseModel):
+    anchoring_chain: Optional[str] = Field(
+        None,
+        description="Optional blockchain name (e.g., Bitcoin, Ethereum)"
+    )
+    note: Optional[str] = Field(
+        None,
+        description="Optional note or reference"
+    )
+
+class BlockchainProofResponse(BaseModel):
+    proof_id: str
+    created_at: str
+    chain_hash: str
+    hash_algorithm: str
+    signature_path: str
+    proof_payload_path: str
 
 # ============================
 # API Endpoints
@@ -333,3 +401,40 @@ def download_signature(report_id: str):
     if not os.path.exists(sig_path):
         raise HTTPException(status_code=404, detail="Signature not found")
     return FileResponse(sig_path, media_type="application/octet-stream", filename=f"{report_id}.sig")
+
+# ============================
+# Blockchain proof API
+# ============================
+
+@app.post("/audit/blockchain-proof", response_model=BlockchainProofResponse)
+def create_blockchain_proof(request: BlockchainProofRequest = Body(...)):
+    storage = load_storage()
+
+    proof_id, payload_path, signature_path, payload = generate_blockchain_proof(
+        storage,
+        anchoring_chain=request.anchoring_chain,
+        note=request.note
+    )
+
+    return {
+        "proof_id": proof_id,
+        "created_at": payload["created_at"],
+        "chain_hash": payload["chain_hash"],
+        "hash_algorithm": payload["hash_algorithm"],
+        "signature_path": signature_path,
+        "proof_payload_path": payload_path
+    }
+
+@app.get("/audit/blockchain-proof/{proof_id}")
+def get_blockchain_proof_payload(proof_id: str):
+    payload_path = os.path.join(PROOF_DIR, f"{proof_id}.json")
+    if not os.path.exists(payload_path):
+        raise HTTPException(status_code=404, detail="Proof not found")
+    return FileResponse(payload_path, media_type="application/json", filename=f"{proof_id}.json")
+
+@app.get("/audit/blockchain-proof/{proof_id}/signature")
+def get_blockchain_proof_signature(proof_id: str):
+    sig_path = os.path.join(PROOF_DIR, f"{proof_id}.sig")
+    if not os.path.exists(sig_path):
+        raise HTTPException(status_code=404, detail="Signature not found")
+    return FileResponse(sig_path, media_type="application/octet-stream", filename=f"{proof_id}.sig")

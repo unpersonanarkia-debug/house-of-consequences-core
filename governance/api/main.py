@@ -7,9 +7,11 @@ import hashlib
 import json
 import os
 import uuid
-from jsonschema import validate, Draft202012Validator
+
+from jsonschema import Draft202012Validator
 from reportlab.lib.pagesizes import A4
 from reportlab.pdfgen import canvas
+
 from cryptography.hazmat.primitives import hashes, serialization
 from cryptography.hazmat.primitives.asymmetric import rsa, padding
 from cryptography.hazmat.backends import default_backend
@@ -24,7 +26,7 @@ app = FastAPI(
     version="1.0.0"
 )
 
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+BASE_DIR = os.path.dirname(os.path.abspath(_file_))
 DATA_DIR = os.path.join(BASE_DIR, "..", "..", "data")
 SCHEMA_DIR = os.path.join(BASE_DIR, "..", "..", "schemas")
 REPORT_DIR = os.path.join(BASE_DIR, "..", "..", "reports")
@@ -38,6 +40,8 @@ os.makedirs(REPORT_DIR, exist_ok=True)
 
 def load_schema(name: str) -> Dict[str, Any]:
     path = os.path.join(SCHEMA_DIR, name)
+    if not os.path.exists(path):
+        raise RuntimeError(f"Schema not found: {path}")
     with open(path, "r", encoding="utf-8") as f:
         return json.load(f)
 
@@ -50,7 +54,7 @@ audit_storage_validator = Draft202012Validator(AUDIT_STORAGE_SCHEMA)
 audit_report_validator = Draft202012Validator(AUDIT_REPORT_SCHEMA)
 
 # ============================
-# Cryptographic utilities
+# Cryptographic utilities (QES)
 # ============================
 
 KEY_DIR = os.path.join(DATA_DIR, "keys")
@@ -58,7 +62,7 @@ PRIVATE_KEY_PATH = os.path.join(KEY_DIR, "qes_private_key.pem")
 PUBLIC_KEY_PATH = os.path.join(KEY_DIR, "qes_public_key.pem")
 os.makedirs(KEY_DIR, exist_ok=True)
 
-def generate_qes_keypair():
+def generate_qes_keypair() -> None:
     if os.path.exists(PRIVATE_KEY_PATH) and os.path.exists(PUBLIC_KEY_PATH):
         return
 
@@ -83,12 +87,23 @@ def generate_qes_keypair():
         ))
 
 def load_private_key():
+    if not os.path.exists(PRIVATE_KEY_PATH):
+        raise RuntimeError("Private key not found; QES keypair not initialized.")
     with open(PRIVATE_KEY_PATH, "rb") as f:
-        return serialization.load_pem_private_key(f.read(), password=None, backend=default_backend())
+        return serialization.load_pem_private_key(
+            f.read(),
+            password=None,
+            backend=default_backend()
+        )
 
 def load_public_key():
+    if not os.path.exists(PUBLIC_KEY_PATH):
+        raise RuntimeError("Public key not found; QES keypair not initialized.")
     with open(PUBLIC_KEY_PATH, "rb") as f:
-        return serialization.load_pem_public_key(f.read(), backend=default_backend())
+        return serialization.load_pem_public_key(
+            f.read(),
+            backend=default_backend()
+        )
 
 generate_qes_keypair()
 
@@ -98,11 +113,11 @@ generate_qes_keypair()
 
 STORAGE_PATH = os.path.join(DATA_DIR, "audit_storage.json")
 
-def initialize_storage():
+def initialize_storage() -> None:
     if os.path.exists(STORAGE_PATH):
         return
 
-    storage = {
+    storage: Dict[str, Any] = {
         "storage_id": f"audit-storage-{uuid.uuid4()}",
         "created_at": datetime.now(timezone.utc).isoformat(),
         "storage_policy": {
@@ -144,10 +159,12 @@ def initialize_storage():
 initialize_storage()
 
 def load_storage() -> Dict[str, Any]:
+    if not os.path.exists(STORAGE_PATH):
+        raise RuntimeError("Audit storage not initialized.")
     with open(STORAGE_PATH, "r", encoding="utf-8") as f:
         return json.load(f)
 
-def save_storage(storage: Dict[str, Any]):
+def save_storage(storage: Dict[str, Any]) -> None:
     audit_storage_validator.validate(storage)
     with open(STORAGE_PATH, "w", encoding="utf-8") as f:
         json.dump(storage, f, indent=2)
@@ -161,7 +178,10 @@ def compute_chain_hash(log_chain: List[Dict[str, Any]]) -> str:
 # ============================
 
 class AuditLogEntry(BaseModel):
-    data: Dict[str, Any] = Field(..., description="Audit log entry conforming to audit.log.schema.json")
+    data: Dict[str, Any] = Field(
+        ...,
+        description="Audit log entry conforming to audit.log.schema.json"
+    )
 
 class AuditReportRequest(BaseModel):
     report_title: str
@@ -179,11 +199,17 @@ def health():
     return {"status": "ok", "service": "House of Consequences – Governance API"}
 
 @app.post("/audit/log")
-def append_audit_log(entry: AuditLogEntry):
+def append_audit_log(entry: AuditLogEntry = Body(...)):
     # Schema validation
-    errors = sorted(audit_log_validator.iter_errors(entry.data), key=lambda e: e.path)
+    errors = sorted(
+        audit_log_validator.iter_errors(entry.data),
+        key=lambda e: list(e.path)
+    )
     if errors:
-        raise HTTPException(status_code=422, detail=[e.message for e in errors])
+        raise HTTPException(
+            status_code=422,
+            detail=[e.message for e in errors]
+        )
 
     storage = load_storage()
 
@@ -218,13 +244,13 @@ def list_audit_logs():
     }
 
 @app.post("/audit/report")
-def generate_audit_report(request: AuditReportRequest):
+def generate_audit_report(request: AuditReportRequest = Body(...)):
     storage = load_storage()
 
     report_id = f"audit-report-{uuid.uuid4()}"
     timestamp = datetime.now(timezone.utc).isoformat()
 
-    report = {
+    report: Dict[str, Any] = {
         "report_id": report_id,
         "generated_at": timestamp,
         "jurisdiction": request.jurisdiction,

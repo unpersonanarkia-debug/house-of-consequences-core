@@ -1,6 +1,9 @@
 fastapi
 uvicorn
 pydantic
-reportlab
+python-jose
 cryptography
-python-dateutil
+reportlab
+PyMuPDF
+jsonschema
+python-multipart

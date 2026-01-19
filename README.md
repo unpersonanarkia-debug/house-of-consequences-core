@@ -1,128 +1,159 @@
-# 🏛️ House of Consequences – Core Engine
+# House of Consequences – Core
 
-*house-of-consequences-core* on institutionaalinen ydinjärjestelmä, joka tekee päätösten seuraukset näkyviksi, mitattaviksi ja oikeudellisesti jäljitettäviksi — ennen kuin päätökset normalisoituvat vahingoksi.
+House of Consequences on avoin, oikeudellisesti todennettava ja yhteiskunnallisesti vastuullinen järjestelmä päätösten, toimien ja seurausten dokumentointiin, auditointiin ja jäljitettävyyteen.
 
-Tämä ei ole analytiikkatyökalu.
-Tämä on *governance-infrastruktuuri*.
+Tämä repository sisältää järjestelmän ytimen: protokollan, skeemat, governance-rajapinnat ja todentamismallit. Se ei ole poliittinen ohjelma, eikä päätöksentekojärjestelmä, vaan *todennettavan vastuun infrastruktuuri*.
 
+---
 
-## 🔍 Mikä tämä on?
+## 🎯 Tarkoitus
 
-House of Consequences on universaali päätösten elinkaarimoottori, joka:
+House of Consequences -järjestelmän tarkoitus on:
 
-- mallintaa *päätöksen vaikutuksen, seuraukset, sopeutumisen, kertaantumisen, normalisoitumisen ja oppimisen*,
-- lukitsee nämä vaiheet *JSON Schema -rakenteiksi*,
-- validoi ne *FastAPI-palvelulla*,
-- kirjaa kaikki vaiheet *oikeudellisesti päteviin audit-lokeihin*,
-- tuottaa *allekirjoitettuja PDF-raportteja (QES)*,
-- ja mahdollistaa *jälkikäteisen vastuun kohdentamisen*.
+- estää haitallisten seurausten normalisoituminen päätöksenteossa,
+- tehdä päätöksenteon vaikutukset näkyviksi ja jäljitettäviksi,
+- mahdollistaa oikeudellisesti pätevän auditoinnin,
+- tarjota avoin ja vastuullinen infrastruktuuri yhteiskunnalliseen valvontaan.
 
+Järjestelmä ei:
+- tee päätöksiä,
+- arvioi moraalia,
+- ohjaa politiikkaa,
+- tarjoa käyttöliittymää.
 
-## 🎯 Miksi tämä on olemassa?
+Se tarjoaa *todentamisen, jäljitettävyyden ja vastuun rakenteen*.
 
-Koska yhteiskunnat eivät kaadu yksittäisiin virheisiin,
-vaan siihen, että virheistä tulee *normaali tila*.
+---
 
-Tämä järjestelmä estää:
+## 🧱 Arkkitehtuurin kokonaiskuva
 
-- haitallisten tilojen normalisoitumisen,
-- vastuun hämärtymisen,
-- päätösten vaikutusten katoamisen instituutioiden sisään.
+Päätöksenteko- ja toimeenpanojärjestelmät]
+|
+v
+Governance API (auditointi)
+|
+v
+Audit-lokit → Hash-ketjut → Raportit → QES-allekirjoitus
+|
+v
+Avoin tarkastus / viranomaisvalvonta / tutkimus
 
+Core-repo sisältää:
+- skeemat (JSON Schema),
+- governance-API:n,
+- raportointi- ja allekirjoituskerroksen,
+- governance-dokumentaation,
+- valvontamallit.
 
-## 🧠 Keskeinen periaate
+---
 
-**Yksikään päätös ei ole valmis ennen kuin sen seuraukset on mallinnettu, mitattu ja arkistoitu.**
-
-
-## 🧱 Arkkitehtuurin ytimet
-
-| Kerros | Kuvaus |
-|--------|--------|
-| 🧬 Schema Layer | Lukitut JSON-skeemat (päätös, evidence, audit, foresight) |
-| ⚙️ Engine Layer | Päätöksen elinkaarimoottori + normalisoitumisen tunnistin |
-| 🧾 Audit Layer | Oikeudellinen audit trail + PKI/QES |
-| 📊 Foresight Layer | Ennusteet, mittarit, PDCA-loopit |
-| 🌐 API Layer | FastAPI-validointi, OpenAPI, integraatiot |
-
-
-## 📁 Projektirakenne
-
+## 🗂 Repository-rakenne
 
 house-of-consequences-core/
-├── api/                  # FastAPI-palvelu
-├── schemas/              # Lukitut JSON Schema -määrittelyt
-├── audit/                # Audit-logit ja raporttigeneraattorit
-├── crypto/               # PKI, QES, allekirjoitukset
-├── governance/           # Päätösten elinkaarimoottori
-├── foresight/            # Ennustemallit ja mittarit
-├── docs/                 # Juridinen ja tekninen dokumentaatio
-└── tests/                # Testaus
+├── governance/
+│   ├── api/                  # Auditointi- ja governance-rajapinta
+│   ├── schemas/              # JSON Schema -määrittelyt
+│   ├── reports/              # Raporttimallit ja -muodot
+│   └── enforcement/          # Governance-valvonta ja sanktiomallit
+├── protocols/                # Protokollamäärittelyt ja ketjurakenteet
+├── compliance/               # Lainsäädäntö- ja standardiviittaukset
+├── docs/                     # Arkkitehtuuri, käyttö, governance
+├── examples/                 # Esimerkkidata ja käyttötapaukset
+├── tests/                    # Testaus ja validointi
+└── README.md                 # Tämä tiedosto
 
+---
 
-## 🔐 Turva ja oikeudellinen pätevyys
+## 📜 Skeemat ja protokollat
 
-Järjestelmä tukee:
+Core nojaa seuraaviin periaatteisiin:
 
-- *Qualified Electronic Signatures (QES)*,
-- *PKI-allekirjoituksia PDF-raporteissa*,
-- *aikaleimattuja, muuttumattomia audit-lokeja*,
-- yhteensopivuutta EU:n eIDAS-asetuksen kanssa.
+- *Append-only audit-lokit*
+- *Kryptografinen ketjutus*
+- *Aikaleimat*
+- *WORM-yhteensopivuus*
+- *QES-allekirjoitus (eIDAS)*
 
+Kaikki tapahtumat validoidaan JSON Schema draft 2020-12 -skeemoilla ennen tallennusta.
 
-## 🚀 Käyttö (kehittäjä)
+Keskeiset skeemat:
 
-```bash
-git clone https://github.com/<org>/house-of-consequences-core.git
-cd house-of-consequences-core
-python -m venv venv
-source venv/bin/activate
-pip install -r requirements.txt
-uvicorn api.main:app --reload
+| Skeema | Tarkoitus |
+|--------|------------|
+| audit.log.schema.json | Yksittäinen audit-merkintä |
+| audit.log.storage.schema.json | Audit-ketjun säilytys |
+| audit.report.schema.json | Raportin rakenne |
+| governance.enforcement.schema.json | Governance-valvonta |
 
+---
 
-API käynnistyy osoitteessa:
+## 🔐 Oikeudellinen kelpoisuus
 
+House of Consequences on suunniteltu täyttämään:
 
-http://127.0.0.1:8000/docs
+- eIDAS-vaatimukset (QES),
+- GDPR:n jäljitettävyys- ja tilivelvollisuusperiaatteet,
+- ISO 27001 / 27701,
+- NIS2,
+- SOC2.
 
+Tämä mahdollistaa järjestelmän käytön:
 
-🌍 Julkinen käyttöliittymä
+- hallinnollisissa prosesseissa,
+- sääntelyvalvonnassa,
+- oikeudellisissa riidoissa,
+- forenssisissa tutkimuksissa.
 
-Tämä core-moottori on suunniteltu integroitavaksi:
-	•	valtiollisiin päätöksentekojärjestelmiin,
-	•	kansalaisyhteiskunnan seurantatyökaluihin.
-        (Kansalaisaloite, avoin data jne.)
-    •	yritysten governance-palvelut toimivat
-        erillisellä kaupallisella lisenssillä.
+---
 
-Julkinen portaali: https://houseofconsequences.org
+## 🧭 Governance-malli
 
+Järjestelmä noudattaa seuraavia periaatteita:
 
-🏛️ Institutionaalinen asema
+- Avoin lähdekoodi (AGPL-3.0).
+- Avoimet skeemat ja dokumentaatio.
+- Päätöksenteko erotettu audit-kerroksesta.
+- Muutokset protokollaan dokumentoidaan ja versioidaan.
+- Yhteisöllinen valvonta ja tarkastettavuus.
 
-House of Consequences ei ole mielipidejärjestelmä.
-Se on rakenteellinen vastuun infrastruktuuri.
+Katso: docs/GOVERNANCE_MODEL.md.
 
-Se ei sano mitä pitää päättää —
-se näyttää mitä tapahtuu, jos päätös hyväksytään.
+---
 
+## 🛠 Tekninen perusta
 
-🧭 Lisenssi ja omistajuus
+- *Kieli*: Python 3.11+
+- *API*: FastAPI
+- *Validointi*: JSON Schema 2020-12
+- *Raportointi*: ReportLab
+- *Allekirjoitus*: RSA-4096, SHA-256, QES-yhteensopiva
+- *Hashaus*: SHA-256, BLAKE3
 
-Tämän järjestelmän ydinarvo on rakenteellinen riippumattomuus.
-Käyttöoikeudet, lisenssit ja institutionaalinen hallintamalli määritellään erillisessä GOVERNANCE_MODEL.md-dokumentissa.
+---
 
+## ⚠️ Rajaukset
 
+Tämä projekti ei:
+- ole poliittinen ohjelma,
+- tee päätöksiä,
+- tarjoa käyttöliittymää,
+- kerää henkilötietoja oletusarvoisesti.
 
-✨ Seuraavat vaiheet
-	1.	🔒 JSON Schema -lukitukset
-	2.	⚙️ FastAPI-validointipalvelu
-	3.	🧾 Audit-log middleware
-	4.	📄 PDF-raporttigeneraattori + QES
-	5.	📘 OpenAPI-sopimus
-	6.	🌐 Domain-portaali (houseofconsequences.org)
+Se on *vastuun ja seurausten todentamisen infrastruktuuri*.
 
+---
 
-House of Consequences ei ole järjestelmä päätöksille.
-Se on järjestelmä seurauksille.
+## 📄 Lisenssi
+
+Ydinkoodi: *AGPL-3.0*  
+Dokumentaatio: *CC-BY-SA-4.0*
+
+Enterprise-käyttö: erillinen sopimus.
+
+---
+
+## 📬 Yhteystiedot
+
+Tekninen tuki: GitHub Issues  
+Governance-keskustelu: GitHub Discussions  
+Yhteistyö ja pilotit: contact@houseofconsequences.org

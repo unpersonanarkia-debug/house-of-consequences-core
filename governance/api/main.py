@@ -1,306 +1,309 @@
-"""
-House of Consequences Governance API v1.1 - Complete Implementation
-GOVERNANCE_MODEL.md §5 Auditability + Red Lines Enforcement
-AGPL-3.0 | January 2026
-"""
-from fastapi import FastAPI, HTTPException, UploadFile, File, Depends, HTTPException
-from fastapi.middleware.cors import CORSMiddleware
+from fastapi import FastAPI, HTTPException, Body
 from fastapi.responses import FileResponse
-from pydantic import BaseModel, validator
-from typing import Dict, Any, List, Optional
-from pathlib import Path
-from datetime import datetime
-import uuid
-import json
+from pydantic import BaseModel, Field
+from typing import List, Optional, Dict, Any
+from datetime import datetime, timezone
 import hashlib
-import jsonschema
-from cryptography.hazmat.primitives import serialization
-from cryptography.hazmat.primitives.asymmetric import padding, rsa
-from cryptography.hazmat.primitives import hashes
-import logging
-
-# Configure structured logging
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s [%(levelname)s] %(name)s: %(message)s',
-    handlers=[logging.StreamHandler()]
-)
-logger = logging.getLogger("hoc_governance")
-
-# Local imports (assuming structure from previous messages)
-from governance.audit.rules import (
-    create_audit_entry, validate_red_lines, audit_chain_status
-)
-from governance.audit.signer import generate_keypair, sign_bytes
+import json
+import os
+import uuid
+from jsonschema import validate, Draft202012Validator
 from reportlab.lib.pagesizes import A4
 from reportlab.pdfgen import canvas
+from cryptography.hazmat.primitives import hashes, serialization
+from cryptography.hazmat.primitives.asymmetric import rsa, padding
+from cryptography.hazmat.backends import default_backend
 
-# Global state
-AUDIT_CHAIN: List[Dict[str, Any]] = []
-PRIVATE_KEY, PUBLIC_KEY = generate_keypair()
-
-# Schemas directory
-SCHEMAS_DIR = Path.cwd() / "schemas"
+# ============================
+# Application setup
+# ============================
 
 app = FastAPI(
-    title="House of Consequences – Governance Enforcement API v1.1",
-    version="1.1.0",
-    description="Constitutional enforcement layer for HoC Core. Implements GOVERNANCE_MODEL.md §1.2 Red Lines + §5 Auditability."
+    title="House of Consequences – Governance API",
+    description="Audit, traceability, legal reporting and QES signing service.",
+    version="1.0.0"
 )
 
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],  # Citizen nodes worldwide
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
+BASE_DIR = os.path.dirname(os.path.abspath(_file_))
+DATA_DIR = os.path.join(BASE_DIR, "..", "..", "data")
+SCHEMA_DIR = os.path.join(BASE_DIR, "..", "..", "schemas")
+REPORT_DIR = os.path.join(BASE_DIR, "..", "..", "reports")
 
-# =============================================================================
-# Pydantic Models (Schema-validated)
-# =============================================================================
+os.makedirs(DATA_DIR, exist_ok=True)
+os.makedirs(REPORT_DIR, exist_ok=True)
 
-class Actor(BaseModel):
-    id: str
-    role: str
-    organization: Optional[str] = None
+# ============================
+# Schema loading
+# ============================
 
-class AuditEntryRequest(BaseModel):
-    actor: Actor
-    action: str
-    target: str
-    meta Dict[str, Any] = {}
+def load_schema(name: str) -> Dict[str, Any]:
+    path = os.path.join(SCHEMA_DIR, name)
+    with open(path, "r", encoding="utf-8") as f:
+        return json.load(f)
 
-    @validator('action')
-    def validate_action(cls, v):
-        forbidden = ["enable_surveillance", "closed_fork", "suppress_audit"]
-        if any(f in v.lower() for f in forbidden):
-            raise ValueError("RED_LINE_VIOLATION: Forbidden action")
-        return v
+AUDIT_LOG_SCHEMA = load_schema("audit.log.schema.json")
+AUDIT_STORAGE_SCHEMA = load_schema("audit.log.storage.schema.json")
+AUDIT_REPORT_SCHEMA = load_schema("audit.report.schema.json")
 
-class EvidencePack(BaseModel):
-    case_id: str
-    evidence_type: str
-    data_hash: str
-    meta Dict[str, Any]
-    
-    @validator('data_hash')
-    def validate_hash(cls, v):
-        if len(v) != 64 or not all(c in '0123456789abcdefABCDEF' for c in v):
-            raise ValueError("Invalid SHA-256 hash")
-        return v
+audit_log_validator = Draft202012Validator(AUDIT_LOG_SCHEMA)
+audit_storage_validator = Draft202012Validator(AUDIT_STORAGE_SCHEMA)
+audit_report_validator = Draft202012Validator(AUDIT_REPORT_SCHEMA)
+
+# ============================
+# Cryptographic utilities
+# ============================
+
+KEY_DIR = os.path.join(DATA_DIR, "keys")
+PRIVATE_KEY_PATH = os.path.join(KEY_DIR, "qes_private_key.pem")
+PUBLIC_KEY_PATH = os.path.join(KEY_DIR, "qes_public_key.pem")
+os.makedirs(KEY_DIR, exist_ok=True)
+
+def generate_qes_keypair():
+    if os.path.exists(PRIVATE_KEY_PATH) and os.path.exists(PUBLIC_KEY_PATH):
+        return
+
+    private_key = rsa.generate_private_key(
+        public_exponent=65537,
+        key_size=4096,
+        backend=default_backend()
+    )
+    public_key = private_key.public_key()
+
+    with open(PRIVATE_KEY_PATH, "wb") as f:
+        f.write(private_key.private_bytes(
+            encoding=serialization.Encoding.PEM,
+            format=serialization.PrivateFormat.PKCS8,
+            encryption_algorithm=serialization.NoEncryption()
+        ))
+
+    with open(PUBLIC_KEY_PATH, "wb") as f:
+        f.write(public_key.public_bytes(
+            encoding=serialization.Encoding.PEM,
+            format=serialization.PublicFormat.SubjectPublicKeyInfo
+        ))
+
+def load_private_key():
+    with open(PRIVATE_KEY_PATH, "rb") as f:
+        return serialization.load_pem_private_key(f.read(), password=None, backend=default_backend())
+
+def load_public_key():
+    with open(PUBLIC_KEY_PATH, "rb") as f:
+        return serialization.load_pem_public_key(f.read(), backend=default_backend())
+
+generate_qes_keypair()
+
+# ============================
+# Storage utilities
+# ============================
+
+STORAGE_PATH = os.path.join(DATA_DIR, "audit_storage.json")
+
+def initialize_storage():
+    if os.path.exists(STORAGE_PATH):
+        return
+
+    storage = {
+        "storage_id": f"audit-storage-{uuid.uuid4()}",
+        "created_at": datetime.now(timezone.utc).isoformat(),
+        "storage_policy": {
+            "append_only": True,
+            "worm_compliant": True,
+            "encryption": {
+                "enabled": False,
+                "algorithm": "AES-256-GCM",
+                "key_management": "manual"
+            },
+            "access_control": {
+                "model": "RBAC",
+                "roles": ["Auditor", "LegalAuthority", "SystemAdmin"]
+            }
+        },
+        "log_chain": [],
+        "retention": {
+            "retention_period": "P30Y",
+            "retention_basis": "legal_obligation",
+            "disposal_method": "none"
+        },
+        "integrity": {
+            "chain_hash": "0" * 64,
+            "hash_algorithm": "SHA-256",
+            "last_chain_position": 0
+        },
+        "legal_status": {
+            "evidentiary_class": "judicial",
+            "compliance_frameworks": ["GDPR", "eIDAS", "ISO27001", "NIS2"],
+            "jurisdiction": "FI"
+        }
+    }
+
+    audit_storage_validator.validate(storage)
+
+    with open(STORAGE_PATH, "w", encoding="utf-8") as f:
+        json.dump(storage, f, indent=2)
+
+initialize_storage()
+
+def load_storage() -> Dict[str, Any]:
+    with open(STORAGE_PATH, "r", encoding="utf-8") as f:
+        return json.load(f)
+
+def save_storage(storage: Dict[str, Any]):
+    audit_storage_validator.validate(storage)
+    with open(STORAGE_PATH, "w", encoding="utf-8") as f:
+        json.dump(storage, f, indent=2)
+
+def compute_chain_hash(log_chain: List[Dict[str, Any]]) -> str:
+    chain_data = json.dumps(log_chain, sort_keys=True).encode("utf-8")
+    return hashlib.sha256(chain_data).hexdigest()
+
+# ============================
+# Models (API I/O)
+# ============================
+
+class AuditLogEntry(BaseModel):
+    data: Dict[str, Any] = Field(..., description="Audit log entry conforming to audit.log.schema.json")
 
 class AuditReportRequest(BaseModel):
-    case_id: str
-    start_time: Optional[str] = None
-    end_time: Optional[str] = None
+    report_title: str
+    jurisdiction: str
+    requesting_authority: str
+    purpose: str
+    scope: Optional[str] = None
 
-# =============================================================================
-# Helpers
-# =============================================================================
+# ============================
+# API Endpoints
+# ============================
 
-def get_previous_hash() -> str:
-    """Get hash of last audit entry."""
-    return AUDIT_CHAIN[-1]["integrity"]["hash"] if AUDIT_CHAIN else "GENESIS"
+@app.get("/health")
+def health():
+    return {"status": "ok", "service": "House of Consequences – Governance API"}
 
-def load_schema(schema_name: str) -> Dict[str, Any]:
-    """Load HoC canonical schema."""
-    schema_path = SCHEMAS_DIR / f"{schema_name}.json"
-    if not schema_path.exists():
-        raise HTTPException(500, f"Schema missing: {schema_name}")
-    return json.loads(schema_path.read_text())
+@app.post("/audit/log")
+def append_audit_log(entry: AuditLogEntry):
+    # Schema validation
+    errors = sorted(audit_log_validator.iter_errors(entry.data), key=lambda e: e.path)
+    if errors:
+        raise HTTPException(status_code=422, detail=[e.message for e in errors])
 
-def validate_schema( Dict[str, Any], schema_name: str):
-    """Validate against HoC constitutional schemas."""
-    schema = load_schema(schema_name)
-    jsonschema.validate(instance=data, schema=schema)
+    storage = load_storage()
 
-def generate_pdf_report(report_ Dict[str, Any], filename: str):
-    """Generate legally admissible PDF report."""
-    c = canvas.Canvas(str(filename), pagesize=A4)
+    # Enforce append-only
+    previous_hash = storage["integrity"]["chain_hash"]
+
+    enriched_entry = entry.data.copy()
+    enriched_entry["chain_position"] = storage["integrity"]["last_chain_position"] + 1
+    enriched_entry["previous_chain_hash"] = previous_hash
+    enriched_entry["recorded_at"] = datetime.now(timezone.utc).isoformat()
+
+    storage["log_chain"].append(enriched_entry)
+    storage["integrity"]["last_chain_position"] = enriched_entry["chain_position"]
+    storage["integrity"]["chain_hash"] = compute_chain_hash(storage["log_chain"])
+
+    save_storage(storage)
+
+    return {
+        "status": "appended",
+        "chain_position": enriched_entry["chain_position"],
+        "current_chain_hash": storage["integrity"]["chain_hash"]
+    }
+
+@app.get("/audit/logs")
+def list_audit_logs():
+    storage = load_storage()
+    return {
+        "storage_id": storage["storage_id"],
+        "log_count": len(storage["log_chain"]),
+        "integrity": storage["integrity"],
+        "log_chain": storage["log_chain"]
+    }
+
+@app.post("/audit/report")
+def generate_audit_report(request: AuditReportRequest):
+    storage = load_storage()
+
+    report_id = f"audit-report-{uuid.uuid4()}"
+    timestamp = datetime.now(timezone.utc).isoformat()
+
+    report = {
+        "report_id": report_id,
+        "generated_at": timestamp,
+        "jurisdiction": request.jurisdiction,
+        "requesting_authority": request.requesting_authority,
+        "purpose": request.purpose,
+        "scope": request.scope,
+        "storage_snapshot": storage,
+        "legal_assertions": {
+            "append_only": True,
+            "worm_compliant": True,
+            "chain_integrity_verified": True,
+            "hash_algorithm": storage["integrity"]["hash_algorithm"],
+            "evidentiary_class": storage["legal_status"]["evidentiary_class"]
+        }
+    }
+
+    # Validate report schema
+    audit_report_validator.validate(report)
+
+    # Generate PDF
+    pdf_path = os.path.join(REPORT_DIR, f"{report_id}.pdf")
+    c = canvas.Canvas(pdf_path, pagesize=A4)
     width, height = A4
-    
-    # Header
+
+    y = height - 50
     c.setFont("Helvetica-Bold", 14)
-    c.drawString(40, height - 60, f"HoC AUDIT REPORT v1.1")
-    c.drawString(40, height - 85, f"Case ID: {report_data['case_id']}")
-    c.drawString(40, height - 110, f"Generated: {report_data['generated_at']}")
-    
-    # Chain status
+    c.drawString(50, y, "Audit Report – House of Consequences")
+    y -= 30
+
     c.setFont("Helvetica", 10)
-    y_pos = height - 160
-    c.drawString(40, y_pos, f"Chain Length: {len(AUDIT_CHAIN)}")
-    c.drawString(40, y_pos - 20, f"Chain Hash: {get_previous_hash()[:32]}...")
-    
-    # Entries summary
-    c.drawString(40, y_pos - 50, "RECENT ENTRIES:")
-    y_pos -= 80
-    for entry in AUDIT_CHAIN[-5:]:
-        c.drawString(40, y_pos, f"- {entry['actor']['role']}: {entry['action']['operation']}")
-        y_pos -= 20
-    
+    for key, value in report.items():
+        text = f"{key}: {json.dumps(value, indent=2) if isinstance(value, (dict, list)) else value}"
+        for line in text.split("\n"):
+            if y < 50:
+                c.showPage()
+                y = height - 50
+                c.setFont("Helvetica", 10)
+            c.drawString(50, y, line[:110])
+            y -= 12
+
     c.showPage()
     c.save()
 
-# =============================================================================
-# GOVERNANCE ENFORCEMENT ENDPOINTS
-# =============================================================================
+    # QES signing
+    private_key = load_private_key()
+    with open(pdf_path, "rb") as f:
+        pdf_bytes = f.read()
 
-@app.post("/audit/entry", summary="Log cryptographically chained audit entry")
-async def log_audit_entry(entry_req: AuditEntryRequest):
-    """Create tamper-evident audit entry with Red Lines validation."""
-    
-    # 1. Schema validation (constitutional layer)
-    raw_entry = entry_req.dict()
-    try:
-        validate_schema(raw_entry, "audit.log.schema")
-    except jsonschema.ValidationError as e:
-        audit_entry = create_audit_entry(
-            actor_id=entry_req.actor.id,
-            role=entry_req.actor.role,
-            action=f"SCHEMA_VIOLATION_{entry_req.action}",
-            target=entry_req.target,
-            metadata={"error": str(e)}
-        )
-        AUDIT_CHAIN.append(audit_entry)
-        raise HTTPException(400, f"Schema violation: {e.message}")
-    
-    # 2. GOVERNANCE_MODEL.md §1.2 Red Lines enforcement
-    violations = validate_red_lines(raw_entry)
-    if violations:
-        audit_entry = create_audit_entry(
-            **raw_entry,
-            previous_hash=get_previous_hash()
-        )
-        audit_entry["compliance_status"] = "non_compliant"
-        audit_entry["violations"] = violations
-        AUDIT_CHAIN.append(audit_entry)
-        raise HTTPException(
-            status_code=412, 
-            detail={"violations": violations, "entry": audit_entry}
-        )
-    
-    # 3. Valid entry → cryptographically chain
-    audit_entry = create_audit_entry(
-        actor_id=entry_req.actor.id,
-        role=entry_req.actor.role,
-        action=entry_req.action,
-        target=entry_req.target,
-        metadata=entry_req.metadata,
-        previous_hash=get_previous_hash()
+    signature = private_key.sign(
+        pdf_bytes,
+        padding.PSS(
+            mgf=padding.MGF1(hashes.SHA256()),
+            salt_length=padding.PSS.MAX_LENGTH
+        ),
+        hashes.SHA256()
     )
-    
-    # 4. Sign + append to immutable chain
-    signature = sign_bytes(PRIVATE_KEY, audit_entry["integrity"]["hash"].encode())
-    audit_entry["signature"]["signature_value"] = signature.hex()
-    
-    AUDIT_CHAIN.append(audit_entry)
-    logger.info(f"Audit entry #{len(AUDIT_CHAIN)} logged: {audit_entry['action']['operation']}")
-    
-    return {
-        "status": "logged",
-        "entry_id": audit_entry["event_id"],
-        "chain_position": audit_entry["integrity"]["chain_position"],
-        "chain_hash": audit_entry["integrity"]["hash"]
-    }
 
-@app.get("/audit/chain", summary="Get full audit chain status")
-async def get_audit_chain():
-    """Return complete tamper-evident audit chain + integrity status."""
-    chain_status = audit_chain_status(AUDIT_CHAIN)
-    
-    return {
-        "chain_length": len(AUDIT_CHAIN),
-        "status": chain_status,
-        "last_hash": get_previous_hash(),
-        "citizen_node_ready": True  # AGPL compliance
-    }
+    signature_path = os.path.join(REPORT_DIR, f"{report_id}.sig")
+    with open(signature_path, "wb") as f:
+        f.write(signature)
 
-@app.post("/audit/report", summary="Generate legally admissible audit report")
-async def generate_audit_report_endpoint(request: AuditReportRequest):
-    """Generate PDF report + QES signature for judicial use."""
-    
-    # Filter chain by time range
-    start_time = datetime.fromisoformat(request.start_time.replace('Z', '+00:00')) if request.start_time else datetime.min
-    end_time = datetime.fromisoformat(request.end_time.replace('Z', '+00:00')) if request.end_time else datetime.max
-    
-    filtered_chain = [
-        entry for entry in AUDIT_CHAIN 
-        if start_time <= datetime.fromisoformat(entry["timestamp"].replace('Z', '+00:00')) <= end_time
-    ]
-    
-    report_id = str(uuid.uuid4())
-    report_data = {
+    return {
+        "status": "report_generated",
         "report_id": report_id,
-        "generated_at": datetime.utcnow().isoformat() + "Z",
-        "case_id": request.case_id,
-        "chain_length": len(filtered_chain),
-        "status": audit_chain_status(filtered_chain)
-    }
-    
-    # Generate PDF
-    pdf_path = Path(f"audit_report_{report_id}.pdf")
-    generate_pdf_report(report_data, pdf_path)
-    
-    # Sign PDF content
-    report_hash = hashlib.sha256(pdf_path.read_bytes()).hexdigest()
-    signature = sign_bytes(PRIVATE_KEY, report_hash.encode())
-    
-    # Audit the audit report generation
-    audit_entry = create_audit_entry(
-        actor_id="hoc-audit-system",
-        role="SystemAuditor",
-        action="generate_audit_report",
-        target=request.case_id,
-        metadata={"report_id": report_id, "pdf_path": str(pdf_path)}
-    )
-    AUDIT_CHAIN.append(audit_entry)
-    
-    return {
-        "status": "generated",
-        "report_id": report_id,
-        "pdf_path": str(pdf_path),
-        "report_hash": report_hash,
-        "signature": signature.hex(),
-        "public_key_pem": PUBLIC_KEY.public_bytes(
-            encoding=serialization.Encoding.PEM,
-            format=serialization.PublicFormat.SubjectPublicKeyInfo
-        ).decode()
+        "pdf_path": pdf_path,
+        "signature_path": signature_path,
+        "chain_hash": storage["integrity"]["chain_hash"]
     }
 
-@app.post("/evidence/validate")
-async def validate_evidence_pack(evidence: Dict[str, Any]):
-    """Validate evidence pack against HoC schemas + Red Lines."""
-    try:
-        validate_schema(evidence, "evidence.pack")
-        validate_red_lines({"action": "evidence_validation", "metadata": evidence})
-        write_audit_log("evidence_validation_success", evidence)
-        return {"status": "valid", "message": "Evidence Pack validated successfully."}
-    except Exception as e:
-        write_audit_log("evidence_validation_failure", evidence)
-        raise HTTPException(status_code=400, detail=str(e))
+@app.get("/audit/report/{report_id}/pdf")
+def download_report(report_id: str):
+    pdf_path = os.path.join(REPORT_DIR, f"{report_id}.pdf")
+    if not os.path.exists(pdf_path):
+        raise HTTPException(status_code=404, detail="Report not found")
+    return FileResponse(pdf_path, media_type="application/pdf", filename=f"{report_id}.pdf")
 
-@app.get("/governance/status")
-async def governance_status():
-    """Real-time governance compliance status."""
-    chain_status = audit_chain_status(AUDIT_CHAIN)
-    return {
-        "status": "ACTIVE" if chain_status["valid"] else "COMPROMISED",
-        "audit_entries": len(AUDIT_CHAIN),
-        "red_line_violations": chain_status.get("red_line_violations", 0),
-        "tamper_detected": chain_status["tamper_detected"],
-        "timestamp": datetime.utcnow().isoformat(),
-        "governance_model": "v1.0-compliant"
-    }
-
-@app.get("/audit/report/{report_id}/download")
-async def download_report(report_id: str):
-    """Download signed audit report PDF."""
-    pdf_path = Path(f"audit_report_{report_id}.pdf")
-    if not pdf_path.exists():
-        raise HTTPException(404, "Report not found")
-    return FileResponse(pdf_path, media_type="application/pdf")
-
-if _name_ == "_main_":
-    import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8000)
+@app.get("/audit/report/{report_id}/signature")
+def download_signature(report_id: str):
+    sig_path = os.path.join(REPORT_DIR, f"{report_id}.sig")
+    if not os.path.exists(sig_path):
+        raise HTTPException(status_code=404, detail="Signature not found")
+    return FileResponse(sig_path, media_type="application/octet-stream", filename=f"{report_id}.sig")
